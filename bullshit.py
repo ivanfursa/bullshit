@@ -30,46 +30,53 @@ def next_hand(plays, table):
         plays = 0
     return plays
 
-def printing(hand_1, hand_2, hand_3, pile):
-    ''' Prints the results of the turn. '''
-    print('1', hand_1)
-    print('2', hand_2)
-    print('3', hand_3)
+def printing(table, pile):
+    ''' Prints the results of the turn:
+        what cards are in each hand and in the pile. '''
+    for hand in range(len(table)):
+        print("Hand", hand+1, table[hand])
     print('pile', pile, '\n')
 
-def carry(table, pile, plays, caller):
+def carry(table, pile, plays, claimed_passing):
     ''' Carries cards from the pile to either a caller or a playing hand. 
-        Returns a transformed table. '''
-    carry_to = random.choice([plays, caller])
+        Caller must not be the playing hand.
+        Announces the caller and callee though print(). 
+        Returns a transformed table state and a next player identifier. '''
+    caller = plays
+    while caller == plays:
+        caller = random.randint(0, len(table)-1)
+    print("Hand", str(caller+1), "calls on hand", str(plays+1))
+    
+    if claimed_passing == pile[-len(claimed_passing):]:
+        carry_to = caller
+    else:
+        carry_to = plays
     table[carry_to] += pile
-    return table
+    
+    if carry_to == plays:
+        return table, caller
+    elif carry_to == caller:
+        return table, plays
     
 def set_carry_turn():
     ''' Used for randomizing carry.'''
     carry_turn = random.randint(1, 5)
     return carry_turn
-    
-def update_turn(turn):
-    ''' Returns incremented turn. '''
-    turn += 1
-    return turn
 
 def name_cards(plays, all_cards, passing):
-    ''' A hand says which cards it has put into the pile. '''
+    ''' A hand announces which cards it has put into the pile. '''
     num = len(passing)
+    # Value of the cards.
     value = all_cards[ random.randint(0, len(all_cards)-1) ]
+    # Making a list of cards a hand said it has put.
+    claimed_passing = []
+    for i in range(num):
+        claimed_passing += [value]
+        
     print("Hand", str(plays+1), "plays", str(num), str(value) + "'s")
-    # return num, value
-
-def who_calls(table, plays):
-    ''' Identifies a hand that calls a playing hand.
-        Caller must not be the playing hand. 
-        Announces the caller and callee. '''
-    caller = plays
-    while caller == plays:
-        caller = random.randint(0, len(table)-1)
-    print("Hand", str(caller+1), "calls on hand", str(plays+1))
-    return caller
+    return claimed_passing
+    
+    
 
 def game_loop():
     ''' Main function of the game.
@@ -94,23 +101,51 @@ def game_loop():
     turn = 0
     empty = False
     
+    # Print the initial state of the table.
+    printing(table, pile)
+    
     while not empty:
+        # Check the number of cards in the game stays the same.
         assert (len(hand_1) + len(hand_2) + len(hand_3) + len(pile)) == 20
-        turn = update_turn(turn)
+        
+        # Turn counter is coordinate when calling (carry) happens
+        # i.e. when one hand calls on the previously played hand.
+        turn += 1
         if pile == []:
             carry_turn = set_carry_turn()
+        
         passing = put_to_pile(table, plays)
-        name_cards(plays, all_cards, passing)
+        claimed_passing = name_cards(plays, all_cards, passing)
         pile += passing
+        
         if turn == carry_turn:
-            caller = who_calls(table, plays)
-            table = carry(table, pile, plays, caller)
+            table, plays_next = carry(table, pile, plays, claimed_passing)
             turn = 0
             pile = []
-        printing(hand_1, hand_2, hand_3, pile)
+        
+        # Print the results of the turn.
+        printing(table, pile)
+        
         empty = is_empty(table, plays)
         if not empty:
-            plays = next_hand(plays, table)
+            if turn == 0:
+                # Next player picked as a result of carry.
+                plays = plays_next
+            else:
+                plays = next_hand(plays, table)
+        elif empty and len(pile) > 0:
+            # Must call on (check) the empty hand at last.
+            # But it could've been already called this turn,
+            # therefore check: (len(pile)>0).
+            table, plays_next = carry(table, pile, plays, claimed_passing)
+            turn = 0
+            pile = []
+            plays = plays_next
+            
+            # Print the result of this calling.
+            printing(table, pile)
+            empty = is_empty(table, plays)
+            
     print("The winner is hand " + str(plays+1) + "!")
 
 game_loop()
